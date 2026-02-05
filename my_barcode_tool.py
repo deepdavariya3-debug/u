@@ -5,7 +5,6 @@ from barcode.writer import ImageWriter
 from fpdf import FPDF
 import io
 import os
-import re
 
 # --- HELPER FUNCTION: TEXT CLEANER ---
 def clean_text_for_pdf(text):
@@ -24,8 +23,8 @@ def clean_text_for_pdf(text):
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Pro Barcode Maker", page_icon="🏷️", layout="wide")
-st.title("🏷️ Ultimate Barcode Sticker Generator (Auto-Fix Version)")
-st.markdown("### હવે એરર નહીં આવે! (₹ અને ગુજરાતી અક્ષરો આપોઆપ સુધારી લેશે)")
+st.title("🏷️ Ultimate Barcode Sticker Generator (Final Version)")
+st.markdown("### હવે ડબલ ટેક્સ્ટ નહીં આવે! (અને એરર પણ નહીં)")
 
 # --- 2. SIDEBAR SETTINGS ---
 st.sidebar.header("⚙️ Page & Sticker Settings")
@@ -54,13 +53,18 @@ if uploaded_file:
         st.write("Data Preview:", df.head(3))
         
         st.subheader("Step 3: કોલમ ધ્યાનથી પસંદ કરો")
+        # અહીં લાલ રંગમાં સૂચના આવશે
+        st.markdown("🔴 **મહત્વનું:** નીચેના ત્રણેય ખાનામાં અલગ-અલગ કોલમ સિલેક્ટ કરો. (એકનું એક નામ ત્રણ વાર સિલેક્ટ ન કરતા).")
+
         c1, c2, c3 = st.columns(3)
         with c1:
-            # અહીં ખાસ SKU કોડ હોવો જોઈએ
+            # અહીં SKU કોડ હોય તે કોલમ પસંદ કરો
             sku_col = st.selectbox("Select Barcode/SKU Column:", df.columns)
         with c2:
+            # અહીં પ્રોડક્ટનું નામ હોય તે કોલમ પસંદ કરો
             name_col = st.selectbox("Select Product Name Column:", df.columns)
         with c3:
+            # અહીં ભાવ હોય તે કોલમ પસંદ કરો
             price_col = st.selectbox("Select Price Column:", df.columns)
         
         if st.button("Generate Professional PDF 🚀"):
@@ -84,7 +88,7 @@ if uploaded_file:
                 # બારકોડ માટે ડેટા લો
                 raw_code = str(row[sku_col]).strip()
                 
-                # Product Name અને Price ને PDF માટે સાફ કરો (No Gujarati/Rupee Symbol)
+                # Product Name અને Price ને PDF માટે સાફ કરો
                 prod_name = clean_text_for_pdf(str(row[name_col]))[:25]
                 price_val = clean_text_for_pdf(str(row[price_col]))
                 
@@ -107,11 +111,11 @@ if uploaded_file:
                     pdf.set_xy(x, y + 2)
                     pdf.cell(cell_width, 4, txt=shop_name, align='C')
                     
-                    # 4. Barcode Image
+                    # 4. Barcode Image (FIXED HERE)
                     rv = io.BytesIO()
-                    # Code128 માં ગુજરાતી અક્ષર હશે તો અહીં એરર આવશે
-                    # એટલે આપણે try-except મૂક્યું છે
-                    Code128(raw_code, writer=ImageWriter()).write(rv, options={"module_height": 8.0, "font_size": 0, "text_distance": 1.0, "quiet_zone": 1.0})
+                    # અહીં "text_distance": 0.0 કર્યું છે, જેથી ઈમેજમાં ટેક્સ્ટ ન આવે
+                    # અને "font_size": 0 કર્યું છે.
+                    Code128(raw_code, writer=ImageWriter()).write(rv, options={"module_height": 8.0, "font_size": 0, "text_distance": 0.0, "quiet_zone": 1.0})
                     
                     temp_img = f"temp_{index}.png"
                     with open(temp_img, "wb") as f:
@@ -122,7 +126,7 @@ if uploaded_file:
                     pdf.image(temp_img, x=x+5, y=y+7, w=img_w, h=img_h)
                     os.remove(temp_img)
                     
-                    # 5. Code Text (Safe Text)
+                    # 5. Code Text (Safe Text - આપણે અલગથી લખીએ છીએ)
                     safe_code_text = clean_text_for_pdf(raw_code)
                     pdf.set_font("Arial", size=6)
                     pdf.set_xy(x, y + 19)
@@ -135,7 +139,6 @@ if uploaded_file:
                     
                     pdf.set_font("Arial", 'B', 10)
                     pdf.set_xy(x, y + 27)
-                    # Currency Symbol પણ સાફ કરેલો વાપરો
                     clean_currency = clean_text_for_pdf(currency_symbol)
                     pdf.cell(cell_width, 5, txt=f"MRP: {clean_currency} {price_val}", align='C')
                     
@@ -151,8 +154,6 @@ if uploaded_file:
                             current_row = 0
                             
                 except Exception as e:
-                    # જો કોઈ લાઈનમાં લોચો હોય તો તે સ્કીપ થશે, પણ એપ ચાલુ રહેશે
-                    # સ્ક્રીન પર વોર્નિંગ દેખાડશે
                     st.warning(f"⚠️ Skipped Item {index+1}: Code '{raw_code}' is invalid. (Check if you selected the wrong column!)")
                     if os.path.exists(f"temp_{index}.png"):
                         os.remove(f"temp_{index}.png")
@@ -161,7 +162,6 @@ if uploaded_file:
                 progress_bar.progress((index + 1) / total_rows)
             
             # Final PDF Download
-            # 'latin-1' error હવે નહીં આવે કારણ કે આપણે પહેલા જ clean_text_for_pdf વાપરી લીધું છે
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             st.success(f"✅ PDF Ready! ({success_count} Stickers Created)")
             st.download_button("📥 Download Final PDF", pdf_bytes, "Stickers.pdf", "application/pdf")
